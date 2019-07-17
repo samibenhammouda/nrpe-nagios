@@ -1,0 +1,66 @@
+---
+
+# This compose file acts as an example on using docker volumes for nagios
+# configuration. As nagios configurations are different for each site they are
+# not concidered part of the container image. The best way to deal with the
+# configurations is to store them in a volume allowing the user to upgrade the
+# image without the need to extract the site configuration from the container.
+
+version: '3'
+services:
+  nagios:
+    image: nrpe/nagios
+    container_name: nagios
+    command: --enable-ndo --create-db --server-url http://192.168.101.100:4000
+    ports:
+      - 4000:80
+    restart: always
+    logging:
+      options:
+        max-size: "10m"
+        max-file: "10"
+    depends_on:
+      - nagios_mysql
+    volumes:
+      - ./data/plugin:/data/plugin
+      - ./data/conf:/usr/local/nagios/etc/mount
+      - ./data/example:/data/example
+
+  nagios_mysql:
+    image: mysql:5.6
+    container_name: mysql
+    ports:
+      - 3306:3306
+    restart: always
+    logging:
+      options:
+        max-size: "10m"
+        max-file: "10"
+    environment:
+      - MYSQL_USER=nagios
+      - MYSQL_PASSWORD=nagios
+      - MYSQL_ADDRESS=nagios_mysql
+      - MYSQL_DATABASE=nagios
+      - MYSQL_RANDOM_ROOT_PASSWORD=yes
+    volumes:
+      - nagios_db_data:/var/lib/mysql
+
+volumes:
+  nagios_db_data:
+  
+  mariadb:
+    image: mariadb:10.2
+    environment:
+      MYSQL_ROOT_PASSWORD: changeme
+      MYSQL_DATABASE: mybb
+      MYSQL_USER: mybb
+      MYSQL_PASSWORD: changeme
+    logging:
+      driver: syslog
+      options:
+        tag: "{{.DaemonName}}(image={{.ImageName}};name={{.Name}};id={{.ID}})"
+    networks:
+      - backend
+    restart: on-failure
+    volumes:
+     - ${PWD}/mariadb:/var/lib/mysql
